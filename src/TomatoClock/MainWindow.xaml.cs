@@ -3,6 +3,7 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.Drawing;
 using System.Linq;
+using System.Text;
 using System.Windows;
 using System.Windows.Forms;
 using Application = System.Windows.Application;
@@ -33,9 +34,9 @@ namespace TomatoClock
             }
         }
 
-        private TimeSpan _ctrDwnInterval;
+        private Timer _timerTomato;
 
-        private Timer _timer;
+        private TimeSpan _ctrDwnInterval;
         private Timer _timerCtrDwn;
 
         public MainWindow()
@@ -56,15 +57,13 @@ namespace TomatoClock
             FetchUserConfig();
 
             Start();
+
+            DisplayCtrDown();
         }
 
-        private static void ShowBalloonTip(NotifyIcon icon, string title, string text, int timeout)
+        private void Notify(string title, string text)
         {
-            if (icon is null) return;
-
-            icon.BalloonTipTitle = title;
-            icon.BalloonTipText = text;
-            icon.ShowBalloonTip(timeout);
+            _icon?.ShowBalloonTip(0, title, text, ToolTipIcon.Info);
         }
 
         private void AddEvents()
@@ -78,15 +77,25 @@ namespace TomatoClock
                 _icon.Visible = true;
             }
 
-            _icon.Click += delegate { WindowState = WindowState.Normal; };
-            _icon.DoubleClick += delegate { WindowState = WindowState.Normal; };
+            _icon.DoubleClick += delegate
+            {
+                WindowState = WindowState.Normal;
+            };
+
+            _icon.MouseMove += delegate
+            {
+                var sb = new StringBuilder();
+                sb.AppendLine($"Next Tomato Clock in {GetCtrDwnString()}");
+                sb.Append(CalculateOff());
+                _icon.Text = sb.ToString();
+            };
 
             StateChanged += delegate
             {
                 if (WindowState is WindowState.Minimized)
                 {
                     ShowInTaskbar = false;
-                    ShowBalloonTip(_icon, "Tomato Minimized", "Click the tray icon to the config window.", 300);
+                    Notify("Tomato Minimized", "Click the tray icon to the config window.");
                 }
                 else if (WindowState == WindowState.Normal)
                 {
@@ -113,49 +122,51 @@ namespace TomatoClock
             var r = MessageBox.Show("Close the tomato clock?", "Wait", MessageBoxButton.YesNo,
                 MessageBoxImage.Information);
             if (r == MessageBoxResult.No)
+            {
                 e.Cancel = true;
+            }
             else
+            {
                 StoreUserConfig();
+                _icon?.Dispose();
+            }
         }
 
         private void Start()
         {
-            IntervalBox.SelectedIndex = (Cfg.Interval) / 5 - 1;
+            IntervalBox.SelectedIndex = Cfg.Interval / 5 - 1;
             HourBox.SelectedIndex = Cfg.OffTimeHour;
             MinuteBox.SelectedIndex = Cfg.OffTimeMinute;
 
             DisplayTomatoNotification();
 
-            _timer?.Close();
-            _timer = new Timer(TimeSpan.FromMinutes(Cfg.Interval).TotalMilliseconds);
-            _timer.Elapsed += delegate
+            _timerTomato?.Close();
+            _timerTomato = new Timer(TimeSpan.FromMinutes(Cfg.Interval).TotalMilliseconds);
+            _timerTomato.Elapsed += delegate
             {
                 FetchUserConfig();
                 DisplayTomatoNotification();
             };
 
-            _timerCtrDwn?.Close();
-            var ts = TimeSpan.FromSeconds(1);
-            _timerCtrDwn = new Timer(ts.TotalMilliseconds);
-            _timerCtrDwn.Elapsed += delegate
-            {
-                _ctrDwnInterval -= ts;
-                DisplayCtrDown();
-            };
-
-            _timer.Start();
-            _timerCtrDwn.Start();
+            _timerTomato.Start();
         }
 
         private void DisplayCtrDown()
         {
-            Dispatcher.Invoke(() =>
+            var ts = TimeSpan.FromSeconds(1);
+            _timerCtrDwn = new Timer(ts.TotalMilliseconds);
+
+            _timerCtrDwn.Elapsed += delegate
             {
-                if (_ctrDwnInterval > TimeSpan.Zero)
+                _ctrDwnInterval -= ts;
+                Dispatcher.Invoke(delegate
                 {
-                    CounterDown.Text = $"{_ctrDwnInterval.Hours:00}:{_ctrDwnInterval.Minutes:00}:{_ctrDwnInterval.Seconds:00}";
-                }
-            });
+                    if (_ctrDwnInterval > TimeSpan.Zero)
+                        CounterDown.Text = GetCtrDwnString();
+                });
+            };
+
+            _timerCtrDwn.Start();
         }
 
         private void FetchUserConfig()
@@ -201,10 +212,12 @@ namespace TomatoClock
             const string text = "Get up to drink some water!";
             var msg = text + Environment.NewLine + CalculateOff();
 
-            Dispatcher.Invoke(delegate
-            {
-                ShowBalloonTip(_icon, title, msg, 1500);
-            });
+            Dispatcher.Invoke(delegate { Notify(title, msg); });
+        }
+
+        private string GetCtrDwnString()
+        {
+            return $"{_ctrDwnInterval.Hours:00}:{_ctrDwnInterval.Minutes:00}:{_ctrDwnInterval.Seconds:00}";
         }
 
         private string CalculateOff()
@@ -212,7 +225,7 @@ namespace TomatoClock
             var now = DateTime.Now;
             var off = new DateTime(now.Year, now.Month, now.Day, Cfg.OffTimeHour, Cfg.OffTimeMinute, 0);
 
-            var timeSpan = (off - now);
+            var timeSpan = off - now;
 
             if (timeSpan <= TimeSpan.Zero) return "OFF NOW.";
 
