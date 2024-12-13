@@ -1,224 +1,225 @@
-﻿using System.IO;
-using System.Text.Json;
+﻿using System;
+using System.Drawing;
+using System.Linq;
 using System.Windows;
+using System.Windows.Forms;
 using Application = System.Windows.Application;
 using MessageBox = System.Windows.MessageBox;
 using Timer = System.Timers.Timer;
 
-namespace TomatoClock;
-
-/// <summary>
-/// Interaction logic for MainWindow.xaml
-/// </summary>
-public partial class MainWindow : Window
+namespace TomatoClock
 {
-    private NotifyIcon? _icon;
-
-    private readonly string[] _intervals = new [] { 15, 20, 25, 30, 35, 40, 45 }.Select(i => i.ToString()).ToArray();
-    private readonly string[] _hours = Enumerable.Range(0, 24).Select(x => x.ToString("00")).ToArray();
-    private readonly string[] _minutes = Enumerable.Range(0, 60).Select(x => x.ToString("00")).ToArray();
-
-    private TomatoConfig _cfg;
-
-    public MainWindow()
+    /// <summary>
+    /// Interaction logic for MainWindow.xaml
+    /// </summary>
+    public partial class MainWindow : Window
     {
-        InitializeComponent();
-        Init();
-        AddEvents();
+        private NotifyIcon _icon;
 
-        _cfg = FetchUserConfig();
+        private readonly string[] _intervals = new [] { 15, 20, 25, 30, 35, 40, 45 }.Select(i => i.ToString()).ToArray();
+        private readonly string[] _hours = Enumerable.Range(0, 24).Select(x => x.ToString("00")).ToArray();
+        private readonly string[] _minutes = Enumerable.Range(0, 60).Select(x => x.ToString("00")).ToArray();
 
-        Start();
-
-        WindowState = WindowState.Minimized;
-        ShowInTaskbar = false;
-    }
-
-    private static string GetUserConfigFile()
-        => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".tomato.config.json");
-
-    private static void Init()
-    {
-        var f = GetUserConfigFile();
-        if (!File.Exists(f)) File.WriteAllText(f, JsonSerializer.Serialize(new TomatoConfig()));
-    }
-
-    private static void ShowBalloonTip(NotifyIcon? icon, string title, string text, int timeout)
-    {
-        if (icon is null) return;
-
-        icon.BalloonTipTitle = title;
-        icon.BalloonTipText = text;
-        icon.ShowBalloonTip(timeout);
-    }
-
-    private void AddEvents()
-    {
-        _icon = new NotifyIcon();
-        var uri = new Uri("pack://application:,,,/tomato.ico", UriKind.Absolute);
-        var rs = Application.GetResourceStream(uri);
-        if (rs is not null)
+        private TomatoConfig _cfg;
+        private TomatoConfig Cfg
         {
-            _icon.Icon = new Icon(rs.Stream);
-            _icon.Visible = true;
+            get => _cfg;
+            set
+            {
+                _cfg = value;
+                _ctrDwnInterval = TimeSpan.FromMinutes(value.Interval);
+            }
         }
 
-        _icon.Click += delegate { WindowState = WindowState.Normal; };
-        _icon.DoubleClick += delegate { WindowState = WindowState.Normal; };
+        private TimeSpan _ctrDwnInterval;
 
-        StateChanged += delegate
+        private Timer _timer;
+        private Timer _timerCtrDwn;
+
+        public MainWindow()
         {
-            if (WindowState is WindowState.Minimized)
-            {
-                ShowInTaskbar = false;
-                ShowBalloonTip(_icon, "Tomato Minimized", "Click the tray icon to return.", 300);
-            }
-            else if (WindowState == WindowState.Normal)
-            {
-                ShowInTaskbar = true;
-            }
-        };
+            InitializeComponent();
 
-        IntervalBox.ItemsSource = _intervals;
-        HourBox.ItemsSource = _hours;
-        MinuteBox.ItemsSource = _minutes;
+            TomatoConfig.Create();
 
-        ApplyButton.Click += delegate
-        {
-            StoreUserConfig();
-            _cfg = FetchUserConfig();
+            AddEvents();
+
+            FetchUserConfig();
+
             Start();
-        };
 
-        Closing += (_, e) =>
+            WindowState = WindowState.Minimized;
+            ShowInTaskbar = false;
+        }
+
+        private static void ShowBalloonTip(NotifyIcon icon, string title, string text, int timeout)
         {
-            var r = MessageBox.Show("Close the tomato clock?", "Wait", MessageBoxButton.YesNo,
-                MessageBoxImage.Information);
-            if (r == MessageBoxResult.No)
-                e.Cancel = true;
-        };
+            if (icon is null) return;
 
-        Closed += delegate
+            icon.BalloonTipTitle = title;
+            icon.BalloonTipText = text;
+            icon.ShowBalloonTip(timeout);
+        }
+
+        private void AddEvents()
         {
-            StoreUserConfig();
-        };
-    }
-
-    private Timer? _timer;
-    private Timer? _timerCtrDwn;
-    private TimeSpan _ctrDwnInterval;
-
-    private void Start()
-    {
-        IntervalBox.SelectedIndex = (_cfg.Interval - 15) / 5;
-        HourBox.SelectedIndex = _cfg.OffTimeHour;
-        MinuteBox.SelectedIndex = _cfg.OffTimeMinute;
-
-        DisplayTomatoNotification();
-
-        _ctrDwnInterval = TimeSpan.FromMinutes(_cfg.Interval);
-        DisplayCtrDown();
-
-        _timer?.Close();
-        _timer = new Timer(TimeSpan.FromMinutes(_cfg.Interval));
-        _timer.Elapsed += delegate
-        {
-            DisplayTomatoNotification();
-            _ctrDwnInterval = TimeSpan.FromMinutes(_cfg.Interval);
-        };
-
-        _timerCtrDwn?.Close();
-        _timerCtrDwn = new Timer(TimeSpan.FromSeconds(1));
-        _timerCtrDwn.Elapsed += delegate
-        {
-            _ctrDwnInterval -= TimeSpan.FromSeconds(1);
-            DisplayCtrDown();
-        };
-
-        _timer.Start();
-        _timerCtrDwn.Start();
-    }
-
-    private void DisplayCtrDown()
-    {
-        Dispatcher.Invoke(() =>
-        {
-            if (_ctrDwnInterval > TimeSpan.Zero)
+            _icon = new NotifyIcon();
+            var uri = new Uri("pack://application:,,,/tomato.ico", UriKind.Absolute);
+            var rs = Application.GetResourceStream(uri);
+            if (rs != null)
             {
-                CounterDown.Text = $"{_ctrDwnInterval.Hours:00}:{_ctrDwnInterval.Minutes:00}:{_ctrDwnInterval.Seconds:00}";
+                _icon.Icon = new Icon(rs.Stream);
+                _icon.Visible = true;
             }
-        });
-    }
 
-    private static TomatoConfig FetchUserConfig()
-    {
-        try
-        {
-            var cfg = JsonSerializer.Deserialize<TomatoConfig>(File.ReadAllText(GetUserConfigFile()))
-                      ?? new TomatoConfig();
+            _icon.Click += delegate { WindowState = WindowState.Normal; };
+            _icon.DoubleClick += delegate { WindowState = WindowState.Normal; };
 
-            return cfg;
-        }
-        catch (Exception)
-        {
-            return new TomatoConfig();
-        }
-    }
-
-    private void StoreUserConfig()
-    {
-        try
-        {
-            var interval = int.Parse(IntervalBox.SelectedItem as string ?? throw new Exception("Interval parsing error."));
-            var hour = int.Parse(HourBox.SelectedItem as string ?? throw new Exception("Hour parsing error."));
-            var minute = int.Parse(MinuteBox.SelectedItem as string ?? throw new Exception("Minute parsing error."));
-
-            var json = new TomatoConfig
+            StateChanged += delegate
             {
-                Interval = interval,
-                OffTimeHour = hour,
-                OffTimeMinute = minute
+                if (WindowState is WindowState.Minimized)
+                {
+                    ShowInTaskbar = false;
+                    ShowBalloonTip(_icon, "Tomato Minimized", "Click the tray icon to the config window.", 300);
+                }
+                else if (WindowState == WindowState.Normal)
+                {
+                    ShowInTaskbar = true;
+                }
             };
 
-            File.WriteAllText(GetUserConfigFile(), JsonSerializer.Serialize(json));
+            IntervalBox.ItemsSource = _intervals;
+            HourBox.ItemsSource = _hours;
+            MinuteBox.ItemsSource = _minutes;
+
+            ApplyButton.Click += delegate
+            {
+                StoreUserConfig();
+                FetchUserConfig();
+                Start();
+            };
+
+            Closing += (_, e) =>
+            {
+                var r = MessageBox.Show("Close the tomato clock?", "Wait", MessageBoxButton.YesNo,
+                    MessageBoxImage.Information);
+                if (r == MessageBoxResult.No)
+                    e.Cancel = true;
+            };
+
+            Closed += delegate
+            {
+                StoreUserConfig();
+            };
         }
-        catch (Exception e)
+
+        private void Start()
         {
-            MessageBox.Show(e.Message, "ERROR", MessageBoxButton.OK, MessageBoxImage.Error);
+            IntervalBox.SelectedIndex = (Cfg.Interval - 15) / 5;
+            HourBox.SelectedIndex = Cfg.OffTimeHour;
+            MinuteBox.SelectedIndex = Cfg.OffTimeMinute;
+
+            DisplayTomatoNotification();
+
+            DisplayCtrDown();
+
+            _timer?.Close();
+            _timer = new Timer(TimeSpan.FromMinutes(Cfg.Interval).TotalMilliseconds);
+            _timer.Elapsed += delegate { DisplayTomatoNotification(); };
+
+            _timerCtrDwn?.Close();
+            var ts = TimeSpan.FromSeconds(1);
+            _timerCtrDwn = new Timer(ts.TotalMilliseconds);
+            _timerCtrDwn.Elapsed += delegate
+            {
+                _ctrDwnInterval -= ts;
+                DisplayCtrDown();
+            };
+
+            _timer.Start();
+            _timerCtrDwn.Start();
         }
-    }
 
-    private void DisplayTomatoNotification()
-    {
-        const string title = "Tomato Clock Is Here.";
-        const string text = "Get up to drink some water!";
-        var msg = text + Environment.NewLine + CalculateOff();
-
-        Dispatcher.Invoke(delegate
+        private void DisplayCtrDown()
         {
-            ShowBalloonTip(_icon, title, msg, 1500);
-        });
-    }
+            Dispatcher.Invoke(() =>
+            {
+                if (_ctrDwnInterval > TimeSpan.Zero)
+                {
+                    CounterDown.Text = $"{_ctrDwnInterval.Hours:00}:{_ctrDwnInterval.Minutes:00}:{_ctrDwnInterval.Seconds:00}";
+                }
+            });
+        }
 
-    private string CalculateOff()
-    {
-        var now = DateTime.Now;
-        var off = new DateTime(now.Year, now.Month, now.Day, _cfg.OffTimeHour, _cfg.OffTimeMinute, 0);
+        private void FetchUserConfig()
+        {
+            try
+            {
+                Cfg = TomatoConfig.Deserialize();
+            }
+            catch (Exception)
+            {
+                Cfg = new TomatoConfig();
+                const string m = "Error loading user config. Use default settings instead.";
+                MessageBox.Show(m, "Oops", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
 
-        var timeSpan = (off - now);
+        private void StoreUserConfig()
+        {
+            try
+            {
+                var interval = int.Parse(IntervalBox.SelectedItem as string ?? throw new Exception("Interval parsing error."));
+                var hour = int.Parse(HourBox.SelectedItem as string ?? throw new Exception("Hour parsing error."));
+                var minute = int.Parse(MinuteBox.SelectedItem as string ?? throw new Exception("Minute parsing error."));
 
-        if (timeSpan <= TimeSpan.Zero) return "OFF NOW.";
+                var cfg = new TomatoConfig
+                {
+                    Interval = interval,
+                    OffTimeHour = hour,
+                    OffTimeMinute = minute
+                };
 
-        var totalHours = timeSpan.TotalHours;
-        var hours = (int)Math.Truncate(totalHours);
-        var minutes = (int)Math.Truncate(timeSpan.TotalMinutes - hours * 60);
+                TomatoConfig.Serialize(cfg);
+            }
+            catch (Exception e)
+            {
+                MessageBox.Show(e.Message, "ERROR", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
 
-        var pm = minutes > 1 ? "minutes" : "minute";
+        private void DisplayTomatoNotification()
+        {
+            const string title = "Tomato Clock Is Here.";
+            const string text = "Get up to drink some water!";
+            var msg = text + Environment.NewLine + CalculateOff();
 
-        if (hours == 0)
-            return $"{minutes} {pm} to OFF.";
+            Dispatcher.Invoke(delegate
+            {
+                ShowBalloonTip(_icon, title, msg, 1500);
+            });
+        }
 
-        var ph = hours > 1 ? "hours" : "hour";
-        return $"{hours} {ph} {minutes} {pm} to OFF.";
+        private string CalculateOff()
+        {
+            var now = DateTime.Now;
+            var off = new DateTime(now.Year, now.Month, now.Day, Cfg.OffTimeHour, Cfg.OffTimeMinute, 0);
+
+            var timeSpan = (off - now);
+
+            if (timeSpan <= TimeSpan.Zero) return "OFF NOW.";
+
+            var totalHours = timeSpan.TotalHours;
+            var hours = (int)Math.Truncate(totalHours);
+            var minutes = (int)Math.Truncate(timeSpan.TotalMinutes - hours * 60);
+
+            var pm = minutes > 1 ? "minutes" : "minute";
+
+            if (hours == 0)
+                return $"{minutes} {pm} to OFF.";
+
+            var ph = hours > 1 ? "hours" : "hour";
+            return $"{hours} {ph} {minutes} {pm} to OFF.";
+        }
     }
 }
