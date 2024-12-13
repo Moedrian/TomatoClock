@@ -2,7 +2,7 @@
 using System.IO;
 using System.Xml.Serialization;
 
-namespace TomatoClock
+namespace Tomato
 {
     [Serializable]
     public sealed class TomatoConfig

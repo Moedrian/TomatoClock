@@ -10,7 +10,7 @@ using Application = System.Windows.Application;
 using MessageBox = System.Windows.MessageBox;
 using Timer = System.Timers.Timer;
 
-namespace TomatoClock
+namespace Tomato
 {
     /// <summary>
     /// Interaction logic for MainWindow.xaml

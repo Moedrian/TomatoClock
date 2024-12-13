@@ -1,7 +1,7 @@
-﻿<Application x:Class="TomatoClock.App"
+﻿<Application x:Class="Tomato.App"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:local="clr-namespace:TomatoClock"
+             xmlns:local="clr-namespace:Tomato"
              StartupUri="MainWindow.xaml">
     <Application.Resources>
          
