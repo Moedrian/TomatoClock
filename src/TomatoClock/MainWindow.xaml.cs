@@ -1,4 +1,6 @@
 ﻿using System;
+using System.ComponentModel;
+using System.Diagnostics;
 using System.Drawing;
 using System.Linq;
 using System.Windows;
@@ -16,7 +18,7 @@ namespace TomatoClock
     {
         private NotifyIcon _icon;
 
-        private readonly string[] _intervals = new [] { 15, 20, 25, 30, 35, 40, 45 }.Select(i => i.ToString()).ToArray();
+        private readonly string[] _intervals = new [] { 5, 10, 15, 20, 25, 30, 35, 40, 45 }.Select(i => i.ToString()).ToArray();
         private readonly string[] _hours = Enumerable.Range(0, 24).Select(x => x.ToString("00")).ToArray();
         private readonly string[] _minutes = Enumerable.Range(0, 60).Select(x => x.ToString("00")).ToArray();
 
@@ -38,6 +40,13 @@ namespace TomatoClock
 
         public MainWindow()
         {
+            var p = Process.GetProcessesByName("TomatoClock"); 
+            if (p.Length == 2)
+            {
+                Application.Current.Shutdown();
+                return;
+            }
+
             InitializeComponent();
 
             TomatoConfig.Create();
@@ -47,9 +56,6 @@ namespace TomatoClock
             FetchUserConfig();
 
             Start();
-
-            WindowState = WindowState.Minimized;
-            ShowInTaskbar = false;
         }
 
         private static void ShowBalloonTip(NotifyIcon icon, string title, string text, int timeout)
@@ -99,33 +105,34 @@ namespace TomatoClock
                 Start();
             };
 
-            Closing += (_, e) =>
-            {
-                var r = MessageBox.Show("Close the tomato clock?", "Wait", MessageBoxButton.YesNo,
-                    MessageBoxImage.Information);
-                if (r == MessageBoxResult.No)
-                    e.Cancel = true;
-            };
+            Closing += PreventClosing;
+        }
 
-            Closed += delegate
-            {
+        private void PreventClosing(object sender, CancelEventArgs e)
+        {
+            var r = MessageBox.Show("Close the tomato clock?", "Wait", MessageBoxButton.YesNo,
+                MessageBoxImage.Information);
+            if (r == MessageBoxResult.No)
+                e.Cancel = true;
+            else
                 StoreUserConfig();
-            };
         }
 
         private void Start()
         {
-            IntervalBox.SelectedIndex = (Cfg.Interval - 15) / 5;
+            IntervalBox.SelectedIndex = (Cfg.Interval) / 5 - 1;
             HourBox.SelectedIndex = Cfg.OffTimeHour;
             MinuteBox.SelectedIndex = Cfg.OffTimeMinute;
 
             DisplayTomatoNotification();
 
-            DisplayCtrDown();
-
             _timer?.Close();
             _timer = new Timer(TimeSpan.FromMinutes(Cfg.Interval).TotalMilliseconds);
-            _timer.Elapsed += delegate { DisplayTomatoNotification(); };
+            _timer.Elapsed += delegate
+            {
+                FetchUserConfig();
+                DisplayTomatoNotification();
+            };
 
             _timerCtrDwn?.Close();
             var ts = TimeSpan.FromSeconds(1);
