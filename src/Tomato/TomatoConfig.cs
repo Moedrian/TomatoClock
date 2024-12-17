@@ -1,5 +1,6 @@
 ﻿using System.IO;
 using System.Text.Json;
+using Application = System.Windows.Application;
 
 namespace Tomato;
 
@@ -12,13 +13,34 @@ public sealed class TomatoConfig
     public int OffTimeHour { get; set; } = 18;
     public int OffTimeMinute { get; set; } = 0;
 
+    private static string GetUserDirectory()
+        => Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+
     private static string GetUserConfigFile()
-        => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".tomato.config.json");
+        => Path.Combine(GetUserDirectory(), ".tomato.config.json");
+
+    private const string TomatoPicture = "Tomato_je.jpg";
+
+    public static string GetTomatoPicture()
+        => Path.Combine(GetUserDirectory(), "Tomato_je.jpg");
 
     public static void Create()
     {
         var f = GetUserConfigFile();
-        if (!File.Exists(f)) Serialize(new TomatoConfig());
+        if (!File.Exists(f))
+            Serialize(new TomatoConfig());
+
+        if (!File.Exists(GetTomatoPicture()))
+        {
+            var uri = new Uri($"pack://application:,,,/{TomatoPicture}", UriKind.Absolute);
+            var streamInfo = Application.GetResourceStream(uri);
+            if (streamInfo is not null)
+            {
+                using var ms = new MemoryStream();
+                streamInfo.Stream.CopyTo(ms);
+                File.WriteAllBytes(GetTomatoPicture(), ms.ToArray());
+            }
+        }
     }
 
     public static void Serialize(TomatoConfig cfg)

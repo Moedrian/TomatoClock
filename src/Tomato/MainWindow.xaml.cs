@@ -1,5 +1,4 @@
-﻿using System.ComponentModel;
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.IO;
 using System.Text;
 using System.Windows;
@@ -21,10 +20,11 @@ public partial class MainWindow : Window
     private readonly string[] _hours = Enumerable.Range(0, 24).Select(x => x.ToString("00")).ToArray();
     private readonly string[] _minutes = Enumerable.Range(0, 60).Select(x => x.ToString("00")).ToArray();
 
-    private Timer? _timerTomato;
-
     private TimeSpan _ctrDwnInterval = TimeSpan.Zero;
     private Timer? _timerCtrDwn;
+
+    private const string DismissButtonArgKey = "action";
+    private const string DismissButtonArgValue = "start";
 
     public MainWindow()
     {
@@ -39,16 +39,19 @@ public partial class MainWindow : Window
 
         TomatoConfig.Create();
 
+        Reset();
+
+        InitializeIcon();
+
         AddEvents();
 
         Start();
-
-        DisplayCtrDown();
     }
 
-    private void AddEvents()
+    private void InitializeIcon()
     {
         _icon = new NotifyIcon();
+
         var uri = new Uri("pack://application:,,,/tomato.ico", UriKind.Absolute);
         var rs = Application.GetResourceStream(uri);
         if (rs != null)
@@ -56,6 +59,26 @@ public partial class MainWindow : Window
             _icon.Icon = new Icon(rs.Stream);
             _icon.Visible = true;
         }
+
+        var contextMenu = new ContextMenuStrip();
+
+        var showMenu = new ToolStripMenuItem("Show");
+        showMenu.Click += delegate { WindowState = WindowState.Normal; };
+        contextMenu.Items.Add(showMenu);
+
+        var resetMenu = new ToolStripMenuItem("Reset");
+        resetMenu.Click += delegate
+        {
+            var r = MessageBox.Show("Reset timer now?", "Wait", MessageBoxButton.YesNo, MessageBoxImage.Information);
+            if (r is MessageBoxResult.Yes) Reset();
+        };
+        contextMenu.Items.Add(resetMenu);
+
+        var exitMenu = new ToolStripMenuItem("Exit");
+        exitMenu.Click += delegate { Close(); };
+        contextMenu.Items.Add(exitMenu);
+
+        _icon.ContextMenuStrip = contextMenu;
 
         _icon.DoubleClick += delegate
         {
@@ -70,6 +93,17 @@ public partial class MainWindow : Window
             _icon.Text = sb.ToString();
         };
 
+        _icon.MouseClick += (_, e) =>
+        {
+            if (e.Button == MouseButtons.Right)
+            {
+                _icon.ContextMenuStrip.Show();
+            }
+        };
+    }
+
+    private void AddEvents()
+    {
         StateChanged += delegate
         {
             if (WindowState is WindowState.Minimized)
@@ -89,56 +123,84 @@ public partial class MainWindow : Window
         HourBox.ItemsSource = _hours;
         MinuteBox.ItemsSource = _minutes;
 
+        ToastNotificationManagerCompat.OnActivated += toastArgs =>
+        {
+            if (ToastArguments.Parse(toastArgs.Argument).TryGetValue(DismissButtonArgKey, out var value))
+            {
+                if (value is DismissButtonArgValue)
+                {
+                    Application.Current.Dispatcher.Invoke(delegate
+                    {
+                        Reset();
+                        _timerCtrDwn?.Start();
+                    });
+                }
+            }
+        };
+
         ApplyButton.Click += delegate
         {
             StoreUserConfig();
-            Start();
+            Reset();
         };
 
-        Closing += PreventClosing;
+        Closing += (_, cancelEventArgs) =>
+        {
+            var r = MessageBox.Show("Close the tomato clock?", "Wait", MessageBoxButton.YesNo,
+                MessageBoxImage.Information);
+            if (r == MessageBoxResult.No)
+            {
+                cancelEventArgs.Cancel = true;
+            }
+            else
+            {
+                StoreUserConfig();
+                _icon?.Dispose();
+            }
+        };
     }
 
-    private void PreventClosing(object? sender, CancelEventArgs e)
-    {
-        var r = MessageBox.Show("Close the tomato clock?", "Wait", MessageBoxButton.YesNo,
-            MessageBoxImage.Information);
-        if (r == MessageBoxResult.No)
-        {
-            e.Cancel = true;
-        }
-        else
-        {
-            StoreUserConfig();
-            _icon?.Dispose();
-        }
-    }
-
-    private void Start()
+    private void Reset()
     {
         var cfg = TomatoConfig.Deserialize();
+
         IntervalBox.SelectedIndex = cfg.Interval / 5 - 1;
         HourBox.SelectedIndex = cfg.OffTimeHour;
         MinuteBox.SelectedIndex = cfg.OffTimeMinute;
 
         _ctrDwnInterval = TimeSpan.FromMinutes(cfg.Interval);
-        DisplayTomatoNotification();
-
-        _timerTomato?.Close();
-        _timerTomato = new Timer(TimeSpan.FromMinutes(cfg.Interval));
-        _timerTomato.Elapsed += delegate
-        {
-            _ctrDwnInterval = TimeSpan.FromMinutes(TomatoConfig.Deserialize().Interval);
-            DisplayTomatoNotification();
-        };
-
-        _timerTomato.Start();
     }
 
-    private void DisplayCtrDown()
+    private void DisplayTomatoNotification()
+    {
+        const string title = "Tomato Clock Is Here.";
+        const string text = "Get up to drink some water!";
+        var msg = text + Environment.NewLine + CalculateOff();
+
+        Dispatcher.Invoke(delegate
+        {
+            var builder = new ToastContentBuilder()
+                .AddText(title)
+                .AddText(msg)
+                .SetToastScenario(ToastScenario.Reminder)
+                .AddButton(new ToastButton()
+                    .SetContent("Dismiss")
+                    .AddArgument(DismissButtonArgKey, DismissButtonArgValue)
+                    .SetBackgroundActivation());
+
+            if (File.Exists(TomatoConfig.GetTomatoPicture()))
+                builder.AddAppLogoOverride(new Uri("file:///" + TomatoConfig.GetTomatoPicture()),
+                    ToastGenericAppLogoCrop.Circle);
+
+            builder.Show();
+        });
+    }
+
+    private void Start()
     {
         var ts = TimeSpan.FromSeconds(1);
-        _timerCtrDwn = new Timer(ts.TotalMilliseconds);
 
+        _timerCtrDwn = new Timer(ts);
         _timerCtrDwn.Elapsed += delegate
         {
             _ctrDwnInterval -= ts;
@@ -146,8 +208,13 @@ public partial class MainWindow : Window
             {
                 try
                 {
-                    if (_ctrDwnInterval > TimeSpan.Zero)
+                    if (_ctrDwnInterval >= TimeSpan.Zero)
                         CounterDown.Text = GetCtrDwnString();
+                    else
+                    {
+                        _timerCtrDwn.Stop();
+                        DisplayTomatoNotification();
+                    }
                 }
                 catch (Exception)
                 {
@@ -180,25 +247,6 @@ public partial class MainWindow : Window
         {
             MessageBox.Show(e.Message, "ERROR", MessageBoxButton.OK, MessageBoxImage.Error);
         }
-    }
-
-    private void DisplayTomatoNotification()
-    {
-        const string title = "Tomato Clock Is Here.";
-        const string text = "Get up to drink some water!";
-        var msg = text + Environment.NewLine + CalculateOff();
-        var logo = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Tomato_je.jpg");
-
-        Dispatcher.Invoke(delegate
-        {
-            new ToastContentBuilder()
-                .AddText(title)
-                .AddText(msg)
-                .SetToastScenario(ToastScenario.Reminder)
-                .AddAppLogoOverride(new Uri("file:///" + logo), ToastGenericAppLogoCrop.Circle)
-                .AddButton(new ToastButtonDismiss())
-                .Show();
-        });
     }
 
     private string GetCtrDwnString()

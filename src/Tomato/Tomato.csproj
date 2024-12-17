@@ -32,9 +32,9 @@
 
   <ItemGroup>
     <Resource Include="tomato.ico" />
-    <EmbeddedResource Include="Tomato_je.jpg">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </EmbeddedResource>
+    <Resource Include="Tomato_je.jpg">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </Resource>
   </ItemGroup>
 
 </Project>
