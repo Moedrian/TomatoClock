@@ -6,7 +6,7 @@
         mc:Ignorable="d"
         WindowStartupLocation="CenterScreen"
         FontSize="24"
-        Title="Tomato Clock" Height="300" Width="620" ResizeMode="CanMinimize">
+        Title="Tomato Clock" Height="300" Width="680" ResizeMode="CanMinimize">
     <Window.Resources>
         <Style TargetType="Label">
             <Setter Property="FontFamily" Value="Bell MT"/>
@@ -15,7 +15,8 @@
             <Setter Property="Margin" Value="5"/>
         </Style>
         <Style TargetType="TextBlock">
-            <Setter Property="FontFamily" Value="Consolas"/>
+            <Setter Property="FontFamily" Value="Courier New"/>
+            <Setter Property="FontWeight" Value="DemiBold"/>
             <Setter Property="HorizontalAlignment" Value="Center"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
             <Setter Property="Margin" Value="5"/>
@@ -24,12 +25,13 @@
             <Setter Property="FontFamily" Value="Bell MT"/>
             <Setter Property="Height" Value="40"/>
             <Setter Property="BorderThickness" Value="0.5"/>
-            <Setter Property="Background" Value="#FFCCBC"/>
+            <Setter Property="Background" Value="#EF9A9A"/>
             <Setter Property="BorderBrush" Value="Beige"/>
             <Setter Property="Margin" Value="5"/>
         </Style>
         <Style TargetType="ComboBox">
-            <Setter Property="FontFamily" Value="Consolas"/>
+            <Setter Property="FontFamily" Value="Courier New"/>
+            <Setter Property="FontWeight" Value="DemiBold"/>
             <Setter Property="Height" Value="40"/>
             <Setter Property="HorizontalContentAlignment" Value="Center"/>
             <Setter Property="VerticalContentAlignment" Value="Center"/>
@@ -40,7 +42,7 @@
             <Setter Property="Background" Value="#FBE9E7"/>
         </Style>
     </Window.Resources>
-    <Grid Background="#FBE9E7">
+    <Grid Background="#FFCDD2">
         <Grid.RowDefinitions>
             <RowDefinition Height="*"/>
             <RowDefinition Height="*"/>
@@ -49,9 +51,9 @@
             <RowDefinition Height="10"/>
         </Grid.RowDefinitions>
         <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="1.5*"/>
             <ColumnDefinition Width="*"/>
-            <ColumnDefinition Width="*"/>
-            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="1.5*"/>
         </Grid.ColumnDefinitions>
 
         <Label Grid.Row="0" Grid.Column="0" Content="Interval:"/>
@@ -66,14 +68,42 @@
                 <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
             <ComboBox Grid.Column="0" Name="HourBox"/>
-            <TextBlock Grid.Column="1" Text=":"/>
+            <TextBlock Grid.Column="1" Text=":" Padding="0"/>
             <ComboBox Grid.Column="2" Name="MinuteBox"/>
         </Grid>
 
-        <Label Grid.Row="2" Grid.Column="0" Content="Next Notification:"/>
-        <TextBlock Grid.Row="2" Grid.Column="1" Name="CounterDown"/>
+        <Label Grid.Row="3" Grid.Column="0" Content="Next Tomato Launch:"/>
+        <TextBlock Grid.Row="3" Grid.Column="1" Name="CounterDown" Padding="0, 6, 0, 0"/>
+        <Button Grid.Row="3" Grid.Column="2" Name="TomatoNowButton"
+                Background="#FFCDD2"
+                BorderBrush="#FFCDD2"
+                HorizontalAlignment="Center"
+                Width="120" Height="40">
+            <StackPanel Orientation="Horizontal">
+                <Image Source="tomato.ico" Height="32"/>
+                <TextBlock Text="Now!" FontFamily="Bell MT" FontWeight="Normal"/>
+            </StackPanel>
+            <Button.Style>
+                <Style TargetType="{x:Type Button}">
+                    <Setter Property="Template">
+                        <Setter.Value>
+                            <ControlTemplate TargetType="{x:Type Button}">
+                                <Border x:Name="Border" Background="{TemplateBinding Background}">
+                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                </Border>
+                                <ControlTemplate.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter Property="Background" Value="#FFEBEE" TargetName="Border"/>
+                                    </Trigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </Setter.Value>
+                    </Setter>
+                </Style>
+            </Button.Style>
+        </Button>
 
-        <Button Grid.Row="3" Grid.Column="1" Content="Apply" Name="ApplyButton"/>
+        <Button Grid.Row="2" Grid.Column="1" Content="Apply" Name="ApplyButton"/>
     </Grid>
 </Window>
 
