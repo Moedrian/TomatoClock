@@ -23,6 +23,8 @@ public partial class MainWindow : Window
     private TimeSpan _ctrDwnInterval = TimeSpan.Zero;
     private Timer? _timerCtrDwn;
 
+    private Timer? _offReminderTimer;
+
     private const string DismissButtonArgKey = "action";
     private const string DismissButtonArgValue = "start";
 
@@ -48,6 +50,8 @@ public partial class MainWindow : Window
         AddEvents();
 
         Start();
+
+        StartOffTimer();
     }
 
     private void InitializeIcon()
@@ -177,27 +181,19 @@ public partial class MainWindow : Window
     {
         var cfg = TomatoConfig.Deserialize();
 
-        //IntervalBox.SelectedIndex = cfg.Interval / 5 - 1;
+        IntervalBox.SelectedIndex = cfg.Interval / 5 - 1;
         HourBox.SelectedIndex = cfg.OffTimeHour;
         MinuteBox.SelectedIndex = cfg.OffTimeMinute;
 
         _ctrDwnInterval = TimeSpan.FromMinutes(cfg.Interval);
     }
 
-    public static ToastContentBuilder GetToastContentBuilder()
+    public static ToastContentBuilder GetToastContentBuilder(string title, string text)
     {
-        const string title = "Tomato Clock Is Here.";
-        const string text = "Get up to drink some water!";
-        var msg = text + Environment.NewLine + CalculateOff();
-
         var builder = new ToastContentBuilder()
             .AddText(title)
-            .AddText(msg)
-            .SetToastScenario(ToastScenario.Reminder)
-            .AddButton(new ToastButton()
-                .SetContent("Start Another Tomato")
-                .AddArgument(DismissButtonArgKey, DismissButtonArgValue)
-                .SetBackgroundActivation());
+            .AddText(text)
+            .SetToastScenario(ToastScenario.Reminder);
 
         if (File.Exists(TomatoConfig.GetTomatoPicture()))
             builder.AddAppLogoOverride(new Uri("file:///" + TomatoConfig.GetTomatoPicture()),
@@ -208,10 +204,44 @@ public partial class MainWindow : Window
 
     private void DisplayTomatoNotification()
     {
+        const string title = "Tomato Clock Is Here.";
+        const string text = "Get up to drink some water!";
+        var msg = text + Environment.NewLine + FormatOff();
+
         if (!_toastOn)
-            GetToastContentBuilder().Show();
+            GetToastContentBuilder(title, msg)
+                .AddButton(new ToastButton()
+                    .SetBackgroundActivation()
+                    .SetContent("Start Another Tomato")
+                    .AddArgument(DismissButtonArgKey, DismissButtonArgValue))
+                .Show();
 
         _toastOn = true;
+    }
+
+    private bool _offReminderRaised;
+    private void StartOffTimer()
+    {
+        var remindTs = TimeSpan.FromMinutes(5);
+        _offReminderTimer = new Timer(TimeSpan.FromSeconds(30));
+        _offReminderTimer.Elapsed += delegate
+        {
+            var ts = CalculateOff();
+
+            if (!_offReminderRaised)
+            {
+                if (ts < remindTs && ts > TimeSpan.Zero)
+                {
+                    GetToastContentBuilder("Time to prepare off!", "Go Go Go")
+                        .AddButton(new ToastButtonDismiss("OKK"))
+                        .Show();
+
+                    _offReminderRaised = true;
+                }
+            }
+        };
+
+        _offReminderTimer.Start();
     }
 
     private void Start()
@@ -248,13 +278,13 @@ public partial class MainWindow : Window
     {
         try
         {
-            //var interval = int.Parse(IntervalBox.SelectedItem as string ?? throw new Exception("Interval parsing error."));
+            var interval = int.Parse(IntervalBox.SelectedItem as string ?? throw new Exception("Interval parsing error."));
             var hour = int.Parse(HourBox.SelectedItem as string ?? throw new Exception("Hour parsing error."));
             var minute = int.Parse(MinuteBox.SelectedItem as string ?? throw new Exception("Minute parsing error."));
 
             var cfg = new TomatoConfig
             {
-                //Interval = interval,
+                Interval = interval,
                 OffTimeHour = hour,
                 OffTimeMinute = minute
             };
@@ -272,13 +302,20 @@ public partial class MainWindow : Window
         return $"{_ctrDwnInterval.Hours:00}:{_ctrDwnInterval.Minutes:00}:{_ctrDwnInterval.Seconds:00}";
     }
 
-    private static string CalculateOff()
+    private static TimeSpan CalculateOff()
     {
         var cfg = TomatoConfig.Deserialize();
         var now = DateTime.Now;
         var off = new DateTime(now.Year, now.Month, now.Day, cfg.OffTimeHour, cfg.OffTimeMinute, 0);
 
         var timeSpan = off - now;
+
+        return timeSpan;
+    }
+
+    private static string FormatOff()
+    {
+        var timeSpan = CalculateOff();
 
         if (timeSpan <= TimeSpan.Zero) return "OFF NOW.";
 
