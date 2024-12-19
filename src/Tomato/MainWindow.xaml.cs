@@ -2,6 +2,7 @@
 using System.IO;
 using System.Text;
 using System.Windows;
+using Windows.UI.Notifications;
 using Microsoft.Toolkit.Uwp.Notifications;
 using Application = System.Windows.Application;
 using MessageBox = System.Windows.MessageBox;
@@ -25,10 +26,9 @@ public partial class MainWindow : Window
 
     private Timer? _offReminderTimer;
 
-    private const string DismissButtonArgKey = "action";
-    private const string DismissButtonArgValue = "start";
-
-    private bool _toastOn;
+    private const string TomatoArgKey = "action";
+    private const string AnotherTomatoValue = "start";
+    private const string ShowTomatoValue = "show";
 
     public MainWindow()
     {
@@ -95,7 +95,7 @@ public partial class MainWindow : Window
         {
             var sb = new StringBuilder();
             sb.AppendLine($"Next Tomato Clock in {GetCtrDwnString()}");
-            sb.Append(CalculateOff());
+            sb.Append(FormatOff());
             _icon.Text = sb.ToString();
         };
 
@@ -131,17 +131,23 @@ public partial class MainWindow : Window
 
         ToastNotificationManagerCompat.OnActivated += toastArgs =>
         {
-            if (ToastArguments.Parse(toastArgs.Argument).TryGetValue(DismissButtonArgKey, out var value))
+            var args = ToastArguments.Parse(toastArgs.Argument);
+
+            if (args.TryGetValue(TomatoArgKey, out var value))
             {
-                if (value is DismissButtonArgValue)
+                Application.Current.Dispatcher.Invoke(delegate
                 {
-                    Application.Current.Dispatcher.Invoke(delegate
+                    if (value is AnotherTomatoValue)
                     {
                         Reset();
                         _timerCtrDwn?.Start();
-                        _toastOn = false;
-                    });
-                }
+                        ToastNotificationManagerCompat.History.RemoveGroup(TomatoArgKey);
+                    }
+                    else if (value is ShowTomatoValue)
+                    {
+                        WindowState = WindowState.Normal;
+                    }
+                });
             }
         };
 
@@ -151,8 +157,7 @@ public partial class MainWindow : Window
             CounterDown.Text = GetCtrDwnString();
             _timerCtrDwn?.Stop();
 
-            if (!_toastOn)
-                DisplayTomatoNotification();
+            DisplayTomatoNotification();
         };
 
         ApplyButton.Click += delegate
@@ -173,6 +178,7 @@ public partial class MainWindow : Window
             {
                 StoreUserConfig();
                 _icon?.Dispose();
+                ToastNotificationManagerCompat.History.Clear();
             }
         };
     }
@@ -193,7 +199,8 @@ public partial class MainWindow : Window
         var builder = new ToastContentBuilder()
             .AddText(title)
             .AddText(text)
-            .SetToastScenario(ToastScenario.Reminder);
+            .SetToastScenario(ToastScenario.Reminder)
+            .SetBackgroundActivation();
 
         if (File.Exists(TomatoConfig.GetTomatoPicture()))
             builder.AddAppLogoOverride(new Uri("file:///" + TomatoConfig.GetTomatoPicture()),
@@ -208,15 +215,28 @@ public partial class MainWindow : Window
         const string text = "Get up to drink some water!";
         var msg = text + Environment.NewLine + FormatOff();
 
-        if (!_toastOn)
-            GetToastContentBuilder(title, msg)
-                .AddButton(new ToastButton()
-                    .SetBackgroundActivation()
-                    .SetContent("Start Another Tomato")
-                    .AddArgument(DismissButtonArgKey, DismissButtonArgValue))
-                .Show();
-
-        _toastOn = true;
+        GetToastContentBuilder(title, msg)
+            .AddArgument(TomatoArgKey, AnotherTomatoValue)
+            .AddButton(new ToastButton()
+                .SetBackgroundActivation()
+                .SetContent("Start Another Tomato")
+                .AddArgument(TomatoArgKey, AnotherTomatoValue))
+            .Show(toast =>
+            {
+                toast.Group = TomatoArgKey;
+                toast.Dismissed += (_, dismissEventArgs) =>
+                {
+                    if (dismissEventArgs.Reason is ToastDismissalReason.UserCanceled)
+                    {
+                        Dispatcher.Invoke(delegate
+                        {
+                            Reset();
+                            _timerCtrDwn?.Start();
+                            ToastNotificationManagerCompat.History.RemoveGroup(TomatoArgKey);
+                        });
+                    }
+                };
+            });
     }
 
     private bool _offReminderRaised;
@@ -239,6 +259,7 @@ public partial class MainWindow : Window
                 if (ts < remindTs && ts > TimeSpan.Zero)
                 {
                     GetToastContentBuilder("Time to prepare off!", "Go Go Go")
+                        .AddArgument(TomatoArgKey, ShowTomatoValue)
                         .AddButton(new ToastButtonDismiss("OKK"))
                         .Show();
 
