@@ -107,7 +107,7 @@ public partial class MainWindow : Window
         };
     }
 
-    private static void AllowOnlyDigits(object? sender, RoutedEventArgs e)
+    private static void AllowOnlyDigits(object sender, RoutedEventArgs e)
     {
         if (sender is TextBox tb)
         {
@@ -116,8 +116,10 @@ public partial class MainWindow : Window
         }
     }
 
-    private static void SetRange(TextBox tb, string min, int max, string maxSubstitution)
+    private static void SetRange(object sender, string min, int max, string maxSubstitution)
     {
+        if (sender is not TextBox tb) return;
+
         if (string.IsNullOrEmpty(tb.Text))
             tb.Text = min;
 
@@ -126,8 +128,10 @@ public partial class MainWindow : Window
             tb.Text = maxSubstitution;
     }
 
-    private static void PadZero(TextBox tb)
+    private static void PadZero(object sender)
     {
+        if (sender is not TextBox tb) return;
+
         if (!string.IsNullOrEmpty(tb.Text))
             tb.Text = tb.Text.PadLeft(2, '0');
     }
@@ -135,20 +139,22 @@ public partial class MainWindow : Window
     private void AddEvents()
     {
         IntervalBox.TextChanged += AllowOnlyDigits;
-
-        HourBox.TextChanged += AllowOnlyDigits;
-        HourBox.TextChanged += delegate { PadZero(HourBox); };
-        HourBox.TextChanged += delegate { SetRange(HourBox, "18", 24, "00"); };
-
-        MinuteBox.TextChanged += AllowOnlyDigits;
-        MinuteBox.TextChanged += delegate { PadZero(MinuteBox); };
-        MinuteBox.TextChanged += delegate { SetRange(MinuteBox, "00", 60, "00"); };
-
+        IntervalBox.TextChanged += (o, _) => { SetRange(o, "45", 45, "45"); };
         IntervalBox.TextChanged += delegate
         {
-            if (string.IsNullOrEmpty(IntervalBox.Text))
-                IntervalBox.Text = "10";
+            if (int.Parse(IntervalBox.Text) == 0)
+                IntervalBox.Text = "45";
         };
+
+        PadZero(HourBox);
+        HourBox.TextChanged += AllowOnlyDigits;
+        HourBox.TextChanged += (o, _) => { PadZero(o); };
+        HourBox.TextChanged += (o, _) => { SetRange(o, "18", 24, "00"); };
+
+        PadZero(MinuteBox);
+        MinuteBox.TextChanged += AllowOnlyDigits;
+        MinuteBox.TextChanged += (o, _) => { PadZero(o); }; 
+        MinuteBox.TextChanged += (o, _) => { SetRange(o, "00", 60, "00"); };
 
         StateChanged += delegate
         {
@@ -345,12 +351,7 @@ public partial class MainWindow : Window
         try
         {
             if (DataContext is TomatoConfig cfg)
-            {
-                if (cfg.Interval > 45)
-                    throw new Exception($"A {cfg.Interval}-minute interval is not good for your health...");
-
                 TomatoConfig.Serialize(cfg);
-            }
         }
         catch (Exception e)
         {
