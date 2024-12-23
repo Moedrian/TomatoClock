@@ -1,11 +1,14 @@
 ﻿using System.Diagnostics;
 using System.IO;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Windows;
 using Windows.UI.Notifications;
 using Microsoft.Toolkit.Uwp.Notifications;
 using Application = System.Windows.Application;
+using Binding = System.Windows.Data.Binding;
 using MessageBox = System.Windows.MessageBox;
+using TextBox = System.Windows.Controls.TextBox;
 using Timer = System.Timers.Timer;
 
 namespace Tomato;
@@ -16,10 +19,6 @@ namespace Tomato;
 public partial class MainWindow : Window
 {
     private NotifyIcon? _icon;
-
-    private readonly string[] _intervals = Enumerable.Range(1, 9).Select(i => (i * 5).ToString()).ToArray();
-    private readonly string[] _hours = Enumerable.Range(0, 24).Select(x => x.ToString("00")).ToArray();
-    private readonly string[] _minutes = Enumerable.Range(0, 60).Select(x => x.ToString("00")).ToArray();
 
     private TimeSpan _ctrDwnInterval = TimeSpan.Zero;
     private Timer? _timerCtrDwn;
@@ -108,8 +107,49 @@ public partial class MainWindow : Window
         };
     }
 
+    private static void AllowOnlyDigits(object? sender, RoutedEventArgs e)
+    {
+        if (sender is TextBox tb)
+        {
+            tb.Text = Regex.Replace(tb.Text, @"[^\d]", string.Empty);
+            tb.CaretIndex = tb.Text.Length;
+        }
+    }
+
+    private static void SetRange(TextBox tb, string min, int max, string maxSubstitution)
+    {
+        if (string.IsNullOrEmpty(tb.Text))
+            tb.Text = min;
+
+        var t = int.Parse(tb.Text);
+        if (t >= max)
+            tb.Text = maxSubstitution;
+    }
+
+    private static void PadZero(TextBox tb)
+    {
+        if (!string.IsNullOrEmpty(tb.Text))
+            tb.Text = tb.Text.PadLeft(2, '0');
+    }
+
     private void AddEvents()
     {
+        IntervalBox.TextChanged += AllowOnlyDigits;
+
+        HourBox.TextChanged += AllowOnlyDigits;
+        HourBox.TextChanged += delegate { PadZero(HourBox); };
+        HourBox.TextChanged += delegate { SetRange(HourBox, "18", 24, "00"); };
+
+        MinuteBox.TextChanged += AllowOnlyDigits;
+        MinuteBox.TextChanged += delegate { PadZero(MinuteBox); };
+        MinuteBox.TextChanged += delegate { SetRange(MinuteBox, "00", 60, "00"); };
+
+        IntervalBox.TextChanged += delegate
+        {
+            if (string.IsNullOrEmpty(IntervalBox.Text))
+                IntervalBox.Text = "10";
+        };
+
         StateChanged += delegate
         {
             if (WindowState is WindowState.Minimized)
@@ -124,10 +164,6 @@ public partial class MainWindow : Window
                 ShowInTaskbar = true;
             }
         };
-
-        IntervalBox.ItemsSource = _intervals;
-        HourBox.ItemsSource = _hours;
-        MinuteBox.ItemsSource = _minutes;
 
         ToastNotificationManagerCompat.OnActivated += toastArgs =>
         {
@@ -187,9 +223,12 @@ public partial class MainWindow : Window
     {
         var cfg = TomatoConfig.Deserialize();
 
-        IntervalBox.SelectedIndex = cfg.Interval / 5 - 1;
-        HourBox.SelectedIndex = cfg.OffTimeHour;
-        MinuteBox.SelectedIndex = cfg.OffTimeMinute;
+        DataContext = cfg;
+
+        var dp = TextBox.TextProperty;
+        IntervalBox.SetBinding(dp, new Binding("Interval") { Source = DataContext });
+        HourBox.SetBinding(dp, new Binding("OffTimeHour") { Source = DataContext });
+        MinuteBox.SetBinding(dp, new Binding("OffTimeMinute") { Source = DataContext });
 
         _ctrDwnInterval = TimeSpan.FromMinutes(cfg.Interval);
     }
@@ -305,18 +344,13 @@ public partial class MainWindow : Window
     {
         try
         {
-            var interval = int.Parse(IntervalBox.SelectedItem as string ?? throw new Exception("Interval parsing error."));
-            var hour = int.Parse(HourBox.SelectedItem as string ?? throw new Exception("Hour parsing error."));
-            var minute = int.Parse(MinuteBox.SelectedItem as string ?? throw new Exception("Minute parsing error."));
-
-            var cfg = new TomatoConfig
+            if (DataContext is TomatoConfig cfg)
             {
-                Interval = interval,
-                OffTimeHour = hour,
-                OffTimeMinute = minute
-            };
+                if (cfg.Interval > 45)
+                    throw new Exception($"A {cfg.Interval}-minute interval is not good for your health...");
 
-            TomatoConfig.Serialize(cfg);
+                TomatoConfig.Serialize(cfg);
+            }
         }
         catch (Exception e)
         {

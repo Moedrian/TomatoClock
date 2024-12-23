@@ -6,7 +6,7 @@
         mc:Ignorable="d"
         WindowStartupLocation="CenterScreen"
         FontSize="24"
-        Title="Tomato Clock" Height="300" Width="680" ResizeMode="CanMinimize">
+        Title="Tomato Clock" Height="300" Width="720" ResizeMode="CanMinimize">
     <Window.Resources>
         <Style TargetType="Label">
             <Setter Property="FontFamily" Value="Bell MT"/>
@@ -29,7 +29,7 @@
             <Setter Property="BorderBrush" Value="Beige"/>
             <Setter Property="Margin" Value="5"/>
         </Style>
-        <Style TargetType="ComboBox">
+        <Style TargetType="TextBox">
             <Setter Property="FontFamily" Value="Courier New"/>
             <Setter Property="FontWeight" Value="DemiBold"/>
             <Setter Property="Height" Value="40"/>
@@ -37,9 +37,7 @@
             <Setter Property="VerticalContentAlignment" Value="Center"/>
             <Setter Property="BorderThickness" Value="0.2"/>
             <Setter Property="Margin" Value="5"/>
-        </Style>
-        <Style TargetType="ComboBoxItem">
-            <Setter Property="Background" Value="#FBE9E7"/>
+            <Setter Property="Background" Value="#FCE4EC"/>
         </Style>
     </Window.Resources>
     <Grid Background="#FFCDD2">
@@ -51,25 +49,24 @@
             <RowDefinition Height="10"/>
         </Grid.RowDefinitions>
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="1.5*"/>
             <ColumnDefinition Width="*"/>
-            <ColumnDefinition Width="1.5*"/>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="*"/>
         </Grid.ColumnDefinitions>
 
-        <Label Grid.Row="0" Grid.Column="0" Content="Interval:"/>
-        <ComboBox Grid.Row="0" Grid.Column="1" Name="IntervalBox"/>
-        <Label Grid.Row="0" Grid.Column="2" Content="Minutes" HorizontalAlignment="Left"/>
+        <Label Grid.Row="0" Grid.Column="0" Content="Interval (Minutes):"/>
+        <TextBox Grid.Row="0" Grid.Column="1" Name="IntervalBox"/>
 
-        <Label Grid.Row="1" Grid.Column="0" Content="Off Time:"/>
+        <Label Grid.Row="1" Grid.Column="0" Content="Off Time (24h):"/>
         <Grid Grid.Row="1" Grid.Column="1">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="30"/>
                 <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
-            <ComboBox Grid.Column="0" Name="HourBox"/>
+            <TextBox Grid.Column="0" Name="HourBox"/>
             <TextBlock Grid.Column="1" Text=":" Padding="0"/>
-            <ComboBox Grid.Column="2" Name="MinuteBox"/>
+            <TextBox Grid.Column="2" Name="MinuteBox"/>
         </Grid>
 
         <Label Grid.Row="3" Grid.Column="0" Content="Next Tomato Launch:"/>
