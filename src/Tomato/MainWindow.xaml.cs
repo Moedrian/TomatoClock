@@ -260,7 +260,7 @@ public partial class MainWindow : Window
                 {
                     GetToastContentBuilder("Time to prepare off!", "Go Go Go")
                         .AddArgument(TomatoArgKey, ShowTomatoValue)
-                        .AddButton(new ToastButtonDismiss("OKK"))
+                        .AddButton(new ToastButtonDismiss())
                         .Show();
 
                     _offReminderRaised = true;
