@@ -25,6 +25,8 @@ public partial class MainWindow : Window
 
     private Timer? _offReminderTimer;
 
+    private Timer? _watchTimer;
+
     private const string TomatoArgKey = "action";
     private const string AnotherTomatoValue = "start";
     private const string ShowTomatoValue = "show";
@@ -184,6 +186,8 @@ public partial class MainWindow : Window
                         Reset();
                         _timerCtrDwn?.Start();
                         ToastNotificationManagerCompat.History.RemoveGroup(TomatoArgKey);
+                        _watchTimer?.Stop();
+                        _watchTimer = null;
                     }
                     else if (value is ShowTomatoValue)
                     {
@@ -200,6 +204,9 @@ public partial class MainWindow : Window
             _timerCtrDwn?.Stop();
 
             DisplayTomatoNotification();
+
+            _watchTimer?.Stop();
+            _watchTimer = null;
         };
 
         ApplyButton.Click += delegate
@@ -278,6 +285,8 @@ public partial class MainWindow : Window
                             Reset();
                             _timerCtrDwn?.Start();
                             ToastNotificationManagerCompat.History.RemoveGroup(TomatoArgKey);
+                            _watchTimer?.Stop();
+                            _watchTimer = null;
                         });
                     }
                 };
@@ -333,7 +342,16 @@ public partial class MainWindow : Window
                     else
                     {
                         _timerCtrDwn.Stop();
+
                         DisplayTomatoNotification();
+
+                        _watchTimer = new Timer(TimeSpan.FromMinutes(5));
+                        _watchTimer.Elapsed += delegate
+                        {
+                            ToastNotificationManagerCompat.History.RemoveGroup(TomatoArgKey);
+                            DisplayTomatoNotification();
+                        };
+                        _watchTimer.Start();
                     }
                 }
                 catch (Exception)
