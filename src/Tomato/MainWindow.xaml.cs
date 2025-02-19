@@ -25,11 +25,14 @@ public partial class MainWindow : Window
 
     private Timer? _offReminderTimer;
 
-    private Timer? _watchTimer;
+    private Timer? _rePopTimer;
 
     private const string TomatoArgKey = "action";
     private const string AnotherTomatoValue = "start";
+    private const string DelayValue = "delay";
     private const string ShowTomatoValue = "show";
+
+    private const int DelayInterval = 10;
 
     public MainWindow()
     {
@@ -181,13 +184,17 @@ public partial class MainWindow : Window
             {
                 Application.Current.Dispatcher.Invoke(delegate
                 {
-                    if (value is AnotherTomatoValue)
+                    if (value is AnotherTomatoValue or DelayValue)
                     {
-                        Reset();
+                        if (value is AnotherTomatoValue)
+                            Reset();
+                        else
+                            _ctrDwnInterval += TimeSpan.FromMinutes(DelayInterval);
+
                         _timerCtrDwn?.Start();
                         ToastNotificationManagerCompat.History.RemoveGroup(TomatoArgKey);
-                        _watchTimer?.Stop();
-                        _watchTimer = null;
+                        _rePopTimer?.Stop();
+                        _rePopTimer = null;
                     }
                     else if (value is ShowTomatoValue)
                     {
@@ -205,8 +212,8 @@ public partial class MainWindow : Window
 
             DisplayTomatoNotification();
 
-            _watchTimer?.Stop();
-            _watchTimer = null;
+            _rePopTimer?.Stop();
+            _rePopTimer = null;
         };
 
         ApplyButton.Click += delegate
@@ -273,6 +280,10 @@ public partial class MainWindow : Window
                 .SetBackgroundActivation()
                 .SetContent("Start Another Tomato")
                 .AddArgument(TomatoArgKey, AnotherTomatoValue))
+            .AddButton(new ToastButton()
+                .SetBackgroundActivation()
+                .SetContent($"Delay for {DelayInterval} minutes")
+                .AddArgument(TomatoArgKey, DelayValue))
             .Show(toast =>
             {
                 toast.Group = TomatoArgKey;
@@ -285,8 +296,8 @@ public partial class MainWindow : Window
                             Reset();
                             _timerCtrDwn?.Start();
                             ToastNotificationManagerCompat.History.RemoveGroup(TomatoArgKey);
-                            _watchTimer?.Stop();
-                            _watchTimer = null;
+                            _rePopTimer?.Stop();
+                            _rePopTimer = null;
                         });
                     }
                 };
@@ -345,13 +356,13 @@ public partial class MainWindow : Window
 
                         DisplayTomatoNotification();
 
-                        _watchTimer = new Timer(TimeSpan.FromMinutes(5));
-                        _watchTimer.Elapsed += delegate
+                        _rePopTimer = new Timer(TimeSpan.FromMinutes(2));
+                        _rePopTimer.Elapsed += delegate
                         {
                             ToastNotificationManagerCompat.History.RemoveGroup(TomatoArgKey);
                             DisplayTomatoNotification();
                         };
-                        _watchTimer.Start();
+                        _rePopTimer.Start();
                     }
                 }
                 catch (Exception)

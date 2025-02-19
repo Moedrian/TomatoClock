@@ -11,6 +11,16 @@
     <PlatformTarget>x64</PlatformTarget>
     <AssemblyName></AssemblyName>
     <StartupObject></StartupObject>
+    <Title>TomatoClock</Title>
+    <Company>Miaomiao</Company>
+    <Product>TomatoClock</Product>
+    <Authors>Moedrian</Authors>
+    <Description>A little tomato clock that reminds you to drink water! Do not sit too long!</Description>
+    <Copyright>Moedrian 2025</Copyright>
+    <RepositoryUrl>https://github.com/Moedrian/TomatoClock</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <AssemblyVersion>1.2.7</AssemblyVersion>
+    <FileVersion>1.2.7</FileVersion>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
